@@ -4,12 +4,20 @@ import pandas as pd
 
 TRAINING_LABELS = r"d:\gwaves_data\g2net-gravitational-wave-detection\training_labels.csv"
 
+
 def read_csv(filename):
 
     with open(filename, newline='') as f:
         reader = csv.reader(f)
         data = list(reader)
     return data
+
+
+def make_labels_dict(labels: list) -> dict:
+    labels_dict = {}
+    for l in labels:
+        labels_dict[l[0]] = int(l[1])
+    return labels_dict
 
 
 if __name__ == "__main__":
@@ -20,7 +28,6 @@ if __name__ == "__main__":
     # id_target = np.array(id_target[1:])
 
     # target = id_target[:, 1]
-
 
     print(id_target_df.head())
     print(id_target_df.columns)
