@@ -8,6 +8,8 @@ import re
 import os
 import pickle
 import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 
 TRAIN_DATA_DIR_WINDOWS = r"d:\gwaves_data\g2net-gravitational-wave-detection\train"
 
@@ -21,10 +23,27 @@ if sys.platform == "win32":
 class SimpleNet(nn.Module):
     def __init__(self):
         super().__init__()
-        self.conv1 = nn.Conv1d(in_channels=3, out_channels=32, kernel_size=16, stride=4)
+        self.conv1 = nn.Conv1d(in_channels=3, out_channels=16, kernel_size=16, stride=4)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.batchnorm1 = nn.BatchNorm1d(num_features=8)
+        self.conv2 = nn.Conv1d(in_channels=8, out_channels=16, kernel_size=8, stride=2)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.output = nn.Linear(in_features=1008, out_features=1)
 
     def forward(self, x):
-        x = self.conv1(x)
+
+        # Layer one
+        x = F.relu(self.conv1(x))
+        x = self.pool1(x)
+        x = self.batchnorm1(x)
+
+        # Layer two
+        x = F.relu(self.conv2(x))
+        x = self.pool2(x)
+
+        x = torch.flatten(x, 1)
+        x = self.output(x)
         return x
 
 
@@ -92,6 +111,9 @@ if __name__ == "__main__":
     batch = torch.from_numpy(batch)
     sn = SimpleNet()
     output = sn.forward(batch.float())
+
+    loss = nn.BCEWithLogitsLoss()
+    optimizer = optim.Adam(sn.parameters(), lr=0.001)
 
     print(output.shape)
 
