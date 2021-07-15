@@ -12,13 +12,15 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 TRAIN_DATA_DIR_WINDOWS = r"d:\gwaves_data\g2net-gravitational-wave-detection\train"
+TRAIN_DATA_DIR_LINUX = r"/media/dawid/My_Passport/gwaves_data/g2net-gravitational-wave-detection/train/"
 
 TRAIN_FILE_NAMES_PICKLE = r"\train_file_names.pkl"
 TRAIN_DATA_DIR = None
 
 if sys.platform == "win32":
     TRAIN_DATA_DIR = TRAIN_DATA_DIR_WINDOWS
-
+elif sys.platform == "linux"
+    TRAIN_DATA_DIR = TRAIN_DATA_DIR_LINUX
 
 class SimpleNet(nn.Module):
     def __init__(self):
