@@ -19,7 +19,7 @@ TRAIN_DATA_DIR = None
 
 if sys.platform == "win32":
     TRAIN_DATA_DIR = TRAIN_DATA_DIR_WINDOWS
-elif sys.platform == "linux"
+elif sys.platform == "linux":
     TRAIN_DATA_DIR = TRAIN_DATA_DIR_LINUX
 
 class SimpleNet(nn.Module):
