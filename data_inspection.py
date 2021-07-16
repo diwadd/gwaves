@@ -2,7 +2,6 @@ import csv
 import numpy as np
 import pandas as pd
 
-TRAINING_LABELS = r"d:\gwaves_data\g2net-gravitational-wave-detection\training_labels.csv"
 
 
 def read_csv(filename):
