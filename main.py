@@ -14,6 +14,8 @@ import torch.optim as optim
 from pathlib import Path
 import time
 from constants import *
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score
 
 class SimpleNet(nn.Module):
     def __init__(self):
@@ -71,10 +73,11 @@ def train_network(net,
                   n_epoch,
                   input_training_data,
                   labels_training_data,
-                  input_test_data=None,
-                  labels_test_data=None):
+                  input_test_data,
+                  labels_test_data):
 
     train_data = combine_and_match_feature_and_label_files(input_training_data, labels_training_data)
+    test_data = combine_and_match_feature_and_label_files(input_test_data, labels_test_data)
 
     criterion = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
@@ -118,8 +121,40 @@ def train_network(net,
             # if i % 20 == 0:   
             #     print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, running_loss / 20))
             #     running_loss = 0.0
-            running_loss += loss.item() 
-        print(f"epoch: {epoch} running_loss: {running_loss/number_of_batches}")
+            running_loss += loss.item()
+
+
+        predicted_labels_list = []
+        true_labels_list = []
+        for i in range(len(test_data)):
+
+            input_batch = np.load(test_data[i][0], allow_pickle=True)
+            labels_batch = np.load(test_data[i][1], allow_pickle=True)
+
+
+            input_batch = torch.from_numpy(input_batch)
+
+            if device is not None:
+                input_batch.to(device)
+                input_batch = input_batch.type(torch.cuda.FloatTensor)
+            else:
+                input_batch = input_batch.type(torch.FloatTensor)
+
+            pred = net.predict(input_batch)
+            pred = pred.cpu().detach().numpy()
+            predicted_labels_list.append(pred)
+            true_labels_list.append(labels_batch)
+
+            # print(f"--> labels_batch: {labels_batch.shape} pred: {pred.shape}")
+
+        predicted_labels = np.concatenate(predicted_labels_list)
+        true_labels = np.concatenate(true_labels_list)
+
+        auc = roc_auc_score(true_labels, predicted_labels)
+
+        # print(f"{len(predicted_labels_list)} {len(true_labels_list)} predicted_labels: {predicted_labels.shape} true_labels: {true_labels.shape}")
+
+        print(f"epoch: {epoch} running_loss: {running_loss/number_of_batches} auc: {auc}")
 
 
 if __name__ == "__main__":
@@ -135,7 +170,19 @@ if __name__ == "__main__":
     input_data = glob.glob(BATCHED_DEFAULT_DIR + r"/*_features.npy")
     labels_data = glob.glob(BATCHED_DEFAULT_DIR + r"/*_labels.npy")
 
-    train_network(net, device, 4, input_data, labels_data)
+    input_data.sort()
+    labels_data.sort()
+
+    # print(input_data[0:3])
+    # print(labels_data[0:3])
+    # print(f"{type(input_data)} {type(labels_data)}")
+
+    splited_data = train_test_split(input_data, labels_data, test_size=0.1, random_state=42)
+    input_train_data, input_test_data, labels_train_data, labels_test_data = splited_data
+
+    print(f"Train size: {len(input_train_data)} Test size: {len(input_test_data)}")
+
+    train_network(net, device, 100, input_train_data, labels_train_data, input_test_data, labels_test_data)
 
     index = random.randint(0, len(input_data) - 1)
     print(f"File: {input_data[index]}")
@@ -150,7 +197,7 @@ if __name__ == "__main__":
 
     labels = net.predict(example_data)
 
-    print(f"labels: {labels}")
+    # print(f"labels: {labels}")
 
     # loss = nn.BCEWithLogitsLoss()
     # optimizer = optim.Adam(sn.parameters(), lr=0.001)
