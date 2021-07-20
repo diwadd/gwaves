@@ -2,6 +2,7 @@ from multiprocessing import process
 import os
 import pickle
 import random
+import glob
 from pathlib import Path
 import numpy as np
 import multiprocessing
@@ -13,7 +14,7 @@ import data_inspection
 
 def dispatch_batched_data_saving(labels_dict,
                                  file_names,
-                                 batch_size=10):
+                                 batch_size=200):
 
     random.shuffle(file_names)
 
@@ -23,7 +24,7 @@ def dispatch_batched_data_saving(labels_dict,
     index = 1
     m = 0
 
-    pool = multiprocessing.Pool(processes=64)
+    pool = multiprocessing.Pool(processes=4)
 
     for i in range(len(file_names)):
 
@@ -44,13 +45,17 @@ def dispatch_batched_data_saving(labels_dict,
             
             pool.apply_async(func=make_and_save_batched_data, args=(small_labels_list, small_file_names_list, index, BATCHED_DEFAULT_DIR, 0.1))
             
+            # printd(f"What's inside: {small_labels_list}")
+
             index += 1
             m = 0
 
+            small_file_names_list = [None for _ in range(batch_size)]
+            small_labels_list = [None for _ in range(batch_size)]
+
     pool.close()
     pool.join()
-
-
+    
 
 def make_and_save_batched_data(labels_list,
                                file_names,
@@ -61,9 +66,7 @@ def make_and_save_batched_data(labels_list,
     printd(f"Starting for index: {index}")
 
     n_files = len(file_names)
-
     data_list = [None for _ in range(n_files)]
-    labels_list = [None for _ in range(n_files)]
     for i in range(len(file_names)):
         # start = time.time()
         fn = file_names[i]
@@ -77,7 +80,7 @@ def make_and_save_batched_data(labels_list,
     features = np.stack(data_list, axis=0)
     labels = np.array(labels_list).reshape((-1, 1))
 
-    print(f"At: {i} Saving batch number: {index} features: {features.shape} labels: {labels.shape}")
+    printd(f"At: {i} Saving batch number: {index} features: {features.shape} labels: {labels.shape}")
 
     # Should switch to torch.save
     np.save(batched_data_dir + r"/" + f"{k}_{index}_features.npy", features)
@@ -105,6 +108,27 @@ def get_train_file_names():
 
         return file_name_list
 
+
+def create_single_batch(labels_dict, file_names, batch_size=10):
+
+    data_list = []
+    labels_list = []
+    for fn in file_names:
+        k = NUMPY_REGEXP.search(fn).group(0)
+        k = k[0:-4]
+        print(f"k: {k[0:-4]}")
+        data_list.append(np.load(fn))
+        labels_list.append(labels_dict[k])
+
+        if len(data_list) == batch_size:
+            break
+
+    batch = np.stack(data_list, axis=0)
+    labels = np.array(labels_list)
+
+    return batch, labels
+
+
 if __name__ == "__main__":
 
     multiprocessing.set_start_method('spawn')
@@ -115,11 +139,11 @@ if __name__ == "__main__":
     labels_dict = data_inspection.make_labels_dict(labels[1:])
 
 
-    test_file_names = get_train_file_names()
-    n_test_files = len(test_file_names)
+    train_file_names = get_train_file_names()
+    n_test_files = len(train_file_names)
     print(f"Number of files: {n_test_files}")
-    print(f"Example file: {test_file_names[0]}")
+    print(f"Example file: {train_file_names[0]}")
 
-    example_data_file_name = test_file_names[0]
+    example_data_file_name = train_file_names[0]
 
-    dispatch_batched_data_saving(labels_dict, test_file_names)
+    dispatch_batched_data_saving(labels_dict, train_file_names)

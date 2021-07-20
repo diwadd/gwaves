@@ -2,10 +2,11 @@ import re
 import sys
 
 TRAIN_DATA_DIR_WINDOWS = r"d:\gwaves_data\g2net-gravitational-wave-detection\train"
-TRAIN_DATA_DIR_LINUX = r"/media/dawid/My_Passport/gwaves_data/g2net-gravitational-wave-detection/train"
+# TRAIN_DATA_DIR_LINUX = r"/media/dawid/My_Passport/gwaves_data/g2net-gravitational-wave-detection/train"
+TRAIN_DATA_DIR_LINUX = r"/media/dawid/265038e9-5053-4290-ad4c-f38fdfe7acec/gwaves_data/g2net-gravitational-wave-detection/train"
 
-BASE_DATA_DIR_LINUX = r"/media/dawid/My_Passport/gwaves_data/g2net-gravitational-wave-detection"
-BATCHED_DEFAULT_DIR = r"/home/dawid/Coding/gwaves_batched_data"
+BASE_DATA_DIR_LINUX = r"/media/dawid/265038e9-5053-4290-ad4c-f38fdfe7acec/gwaves_data/g2net-gravitational-wave-detection"
+BATCHED_DEFAULT_DIR = r"/media/dawid/265038e9-5053-4290-ad4c-f38fdfe7acec/gwaves_batched_data"
 
 TRAIN_FILE_NAMES_PICKLE_WINDOWS = r"\train_file_names.pkl"
 TRAIN_FILE_NAMES_PICKLE_LINUX = r"/train_file_names.pkl"

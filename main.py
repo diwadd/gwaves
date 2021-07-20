@@ -13,31 +13,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from pathlib import Path
 import time
-
-TRAIN_DATA_DIR_WINDOWS = r"d:\gwaves_data\g2net-gravitational-wave-detection\train"
-TRAIN_DATA_DIR_LINUX = r"/media/dawid/My_Passport/gwaves_data/g2net-gravitational-wave-detection/train"
-
-BASE_DATA_DIR_LINUX = r"/media/dawid/My_Passport/gwaves_data/g2net-gravitational-wave-detection"
-BATCHED_DEFAULT_DIR = r"/home/dawid/Coding/gwaves_batched_data"
-
-TRAIN_FILE_NAMES_PICKLE_WINDOWS = r"\train_file_names.pkl"
-TRAIN_FILE_NAMES_PICKLE_LINUX = r"/train_file_names.pkl"
-TRAINING_LABELS = r"/training_labels.csv"
-NUMPY_SEARCH_PATTERN_LINUX = r"/**/*.npy"
-NUMPY_REGEXP = re.compile(r"[0-9a-z]{10}.npy")
-TRAIN_DATA_DIR = None
-BASE_DATA_DIR = None
-TRAIN_FILE_NAMES_PICKLE = None
-NUMPY_SEARCH_PATTERN = None
-
-if sys.platform == "win32":
-    TRAIN_DATA_DIR = TRAIN_DATA_DIR_WINDOWS
-    TRAIN_FILE_NAMES_PICKLE = TRAIN_FILE_NAMES_PICKLE_WINDOWS
-elif sys.platform == "linux":
-    TRAIN_DATA_DIR = TRAIN_DATA_DIR_LINUX
-    TRAIN_FILE_NAMES_PICKLE = TRAIN_FILE_NAMES_PICKLE_LINUX
-    BASE_DATA_DIR = BASE_DATA_DIR_LINUX
-    NUMPY_SEARCH_PATTERN = NUMPY_SEARCH_PATTERN_LINUX
+from constants import *
 
 class SimpleNet(nn.Module):
     def __init__(self):
@@ -51,6 +27,8 @@ class SimpleNet(nn.Module):
         self.batchnorm2 = nn.BatchNorm1d(num_features=8)
 
         self.output = nn.Linear(in_features=1008, out_features=1)
+
+        self.prediction_output = nn.Sigmoid()
 
     def forward(self, x):
 
@@ -68,33 +46,53 @@ class SimpleNet(nn.Module):
         x = self.output(x)
         return x
 
-def train_network(net, device=None, n_epoch=10):
+    def predict(self, x):
+        return self.prediction_output(self.forward(x))
+
+
+def combine_and_match_feature_and_label_files(feature_failes, label_files):
+
+    feature_failes.sort()
+    label_files.sort()
+
+    # Make sure that labels match features
+    data = list(zip(feature_failes, label_files))
+    for d in data:
+        i = os.path.basename(d[0]).replace("features", "xkdc")
+        l = os.path.basename(d[1]).replace("labels", "xkdc")
+
+        assert i == l, "Files do not match!"
+
+    return data
+
+
+def train_network(net,
+                  device,
+                  n_epoch,
+                  input_training_data,
+                  labels_training_data,
+                  input_test_data=None,
+                  labels_test_data=None):
+
+    train_data = combine_and_match_feature_and_label_files(input_training_data, labels_training_data)
 
     criterion = torch.nn.BCEWithLogitsLoss()
     optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
 
-    input_data = glob.glob(BATCHED_DEFAULT_DIR + r"/*_features.npy")
-    labels_data = glob.glob(BATCHED_DEFAULT_DIR + r"/*_labels.npy")
-    print(input_data)
-    print(labels_data)
-
-    input_data.sort()
-    labels_data.sort()
-
-    train_data = list(zip(input_data, labels_data))
-    for td in train_data:
-        i = os.path.basename(td[0]).replace("features", "xkdc")
-        l = os.path.basename(td[1]).replace("labels", "xkdc")
-
-        assert i == l, "Files do not match!"
-
     for epoch in range(n_epoch):
 
         running_loss = 0.0
-        for i in range(len(train_data)):
+        number_of_batches = 10
 
-            input_batch = np.load(train_data[i][0])
-            labels_batch = np.load(train_data[i][1])
+        batch_points = [random.randint(0, len(train_data)-1)  for _ in range(number_of_batches)]
+
+        for i in batch_points:
+
+            # if i % 100 == 0:
+            #     print(f"We are at {epoch} - {i}")
+
+            input_batch = np.load(train_data[i][0], allow_pickle=True)
+            labels_batch = np.load(train_data[i][1], allow_pickle=True)
 
             input_batch = torch.from_numpy(input_batch)
             labels_batch = torch.from_numpy(labels_batch)
@@ -121,125 +119,38 @@ def train_network(net, device=None, n_epoch=10):
             #     print('[%d, %5d] loss: %.3f' % (epoch + 1, i + 1, running_loss / 20))
             #     running_loss = 0.0
             running_loss += loss.item() 
-        print(f"epoch: {epoch} running_loss: {running_loss/len(train_data)}")
-
-
-
-def get_test_file_names():
-
-    if os.path.isfile(TRAIN_DATA_DIR + TRAIN_FILE_NAMES_PICKLE):
-
-        with open(TRAIN_DATA_DIR + TRAIN_FILE_NAMES_PICKLE, "rb") as f:
-            file_name_list = pickle.load(f)
-        return file_name_list
-
-    else:
-
-        search_expr = TRAIN_DATA_DIR + NUMPY_SEARCH_PATTERN
-        print(f"Searching in: {search_expr}")
-
-        file_name_list = glob.glob(search_expr, recursive=True)
-        with open(TRAIN_DATA_DIR + TRAIN_FILE_NAMES_PICKLE, "wb") as f:
-            pickle.dump(file_name_list, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-        return file_name_list
-
-
-def create_single_batch(labels_dict, file_names, batch_size=10):
-
-    data_list = []
-    labels_list = []
-    for fn in file_names:
-        k = NUMPY_REGEXP.search(fn).group(0)
-        k = k[0:-4]
-        print(f"k: {k[0:-4]}")
-        data_list.append(np.load(fn))
-        labels_list.append(labels_dict[k])
-
-        if len(data_list) == batch_size:
-            break
-
-    batch = np.stack(data_list, axis=0)
-    labels = np.array(labels_list)
-
-    return batch, labels
-
-
-def make_and_save_batched_data(labels_dict,
-                               file_names,
-                               batch_size=100,
-                               batched_data_dir=BATCHED_DEFAULT_DIR,
-                               train_test_split=0.1):
-
-    random.shuffle(file_names)
-
-    data_list = [None for _ in range(batch_size)]
-    labels_list = [None for _ in range(batch_size)]
-    m = 0
-    index = 1
-    for i in range(len(file_names)):
-        # start = time.time()
-        fn = file_names[i]
-        k = NUMPY_REGEXP.search(fn).group(0)
-        k = k[0:-4]
-
-        data_list[m] = np.load(fn)
-        labels_list[m]=labels_dict[k]
-
-        m += 1
-
-        if m == batch_size:
-            Path(batched_data_dir).mkdir(parents=True, exist_ok=True)
-
-            features = np.stack(data_list, axis=0)
-            labels = np.array(labels_list).reshape((-1, 1))
-
-            print(f"At: {i} Saving batch number: {index} features: {features.shape} labels: {labels.shape}")
-
-            # Should switch to torch.save
-            np.save(batched_data_dir + r"/" + f"{k}_{index}_features.npy", features)
-            np.save(batched_data_dir + r"/" + f"{k}_{index}_labels.npy", labels)
-
-            data_list = [None for _ in range(batch_size)]
-            labels_list = [None for _ in range(batch_size)]
-
-            index += 1
-            m = 0
-
-        # stop = time.time()
-        # print(f"Elapsed time: {stop - start}")
-
-    # For the time being we ignore len(data_list) != 0
-
+        print(f"epoch: {epoch} running_loss: {running_loss/number_of_batches}")
 
 
 if __name__ == "__main__":
 
     print("Processing...")
 
-    labels = data_inspection.read_csv(BASE_DATA_DIR + TRAINING_LABELS)
-    labels_dict = data_inspection.make_labels_dict(labels[1:])
+    device = torch.device("cuda:0")
 
-
-    test_file_names = get_test_file_names()
-    n_test_files = len(test_file_names)
-    print(f"Number of files: {n_test_files}")
-    print(f"Example file: {test_file_names[0]}")
-
-    example_data_file_name = test_file_names[0]
-
-    batch, labels = create_single_batch(labels_dict, test_file_names, batch_size=10)
-
-    print(f"batch size: {batch.shape} labels: {labels.shape}")
-    # example_data_file_name = r"d:\gwaves_data\g2net-gravitational-wave-detection\test\0\0\0\00005bced6.npy"
-
-    # make_and_save_batched_data(labels_dict, test_file_names)
-
-    # batch = torch.from_numpy(batch)
-    sn = SimpleNet()
+    net = SimpleNet()
+    net.to(device)
     # output = sn.forward(batch.float())
 
-    train_network(sn, device=None, n_epoch=100)
+    input_data = glob.glob(BATCHED_DEFAULT_DIR + r"/*_features.npy")
+    labels_data = glob.glob(BATCHED_DEFAULT_DIR + r"/*_labels.npy")
+
+    train_network(net, device, 4, input_data, labels_data)
+
+    index = random.randint(0, len(input_data) - 1)
+    print(f"File: {input_data[index]}")
+
+    example_data = np.load(input_data[index])
+
+    example_data = torch.from_numpy(example_data)
+    example_data.to(device)
+    example_data = example_data.type(torch.cuda.FloatTensor)
+
+    print(f"example data shape: {example_data.shape}")
+
+    labels = net.predict(example_data)
+
+    print(f"labels: {labels}")
 
     # loss = nn.BCEWithLogitsLoss()
     # optimizer = optim.Adam(sn.parameters(), lr=0.001)
