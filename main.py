@@ -80,12 +80,12 @@ def train_network(net,
     test_data = combine_and_match_feature_and_label_files(input_test_data, labels_test_data)
 
     criterion = torch.nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9)
+    optimizer = torch.optim.SGD(net.parameters(), lr=0.01)
 
     for epoch in range(n_epoch):
 
         running_loss = 0.0
-        number_of_batches = 10
+        number_of_batches = 100
 
         batch_points = [random.randint(0, len(train_data)-1)  for _ in range(number_of_batches)]
 
@@ -182,7 +182,7 @@ if __name__ == "__main__":
 
     print(f"Train size: {len(input_train_data)} Test size: {len(input_test_data)}")
 
-    train_network(net, device, 100, input_train_data, labels_train_data, input_test_data, labels_test_data)
+    train_network(net, device, 200, input_train_data, labels_train_data, input_test_data, labels_test_data)
 
     index = random.randint(0, len(input_data) - 1)
     print(f"File: {input_data[index]}")
